@@ -1,0 +1,36 @@
+<html>
+    <head>
+      <style>
+        #canvas-container {
+          width: 100%;
+          text-align:center;
+        }
+        
+        body {
+          background: darkgray;
+        }
+
+        canvas {
+          display: inline;
+          background: white;
+        }
+      </style>
+      <script src="https://cdn.jsdelivr.net/npm/stats-js@1.0.1/build/stats.min.js"></script>
+    </head>
+    <body style="margin: 0px" oncontextmenu="return false;">
+        <div id="canvas-container">        
+          <canvas id="screen"></script>
+        </div>
+        <script>
+          const screen = document.getElementById("screen");
+          
+          function resizeScreen() {
+            screen.width = window.innerHeight * 4 / 3;
+            screen.height = window.innerHeight;
+          }
+          
+          resizeScreen();
+        </script>
+        <script src="index.js"></script>
+    </body>
+</html>
