@@ -153,6 +153,7 @@ Cell.SAND = 1;
 const cells = createTable(world.width, world.height, Cell.EMPTY);
 
 const start = Date.now();
+const time = () => (Date.now() - start) / 1e3;
 
 const stats = new Stats();
 stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
@@ -193,6 +194,7 @@ function update() {
     }
   }
   
+  // UPDATE
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
       const cell = cells[y][x];
@@ -203,12 +205,25 @@ function update() {
           if (getCell(x, y-1) == Cell.EMPTY) {
             cells[y][x] = Cell.EMPTY;
             cells[y-1][x] = Cell.SAND;
-          } else if (getCell(x-1, y-1) == Cell.EMPTY) {
-            cells[y][x] = Cell.EMPTY;
-            cells[y-1][x-1] = Cell.SAND;
-          } else if (getCell(x+1, y-1) == Cell.EMPTY) {
-            cells[y][x] = Cell.EMPTY;
-            cells[y-1][x+1] = Cell.SAND;
+          } else {
+            const t = Math.random() * 2;
+            if (t % 2 == 0) {
+              if (getCell(x-1, y-1) == Cell.EMPTY) {
+                cells[y][x] = Cell.EMPTY;
+                cells[y-1][x-1] = Cell.SAND;
+              } else if (getCell(x+1, y-1) == Cell.EMPTY) {
+                cells[y][x] = Cell.EMPTY;
+                cells[y-1][x+1] = Cell.SAND;
+              }
+            } else {
+              if (getCell(x+1, y-1) == Cell.EMPTY) {
+                cells[y][x] = Cell.EMPTY;
+                cells[y-1][x+1] = Cell.SAND;
+              } else if (getCell(x-1, y-1) == Cell.EMPTY) {
+                cells[y][x] = Cell.EMPTY;
+                cells[y-1][x-1] = Cell.SAND;
+              }
+            }
           }
       }
     }
@@ -217,8 +232,7 @@ function update() {
 
 function render() {
   stats.begin();
-  const time = (Date.now() - start) / 1e3;
-  gl.uniform1f(glLocations.u.time, time);
+  gl.uniform1f(glLocations.u.time, time());
   
   let i = 0;
   for (let y = 0; y < world.height; y++) {
