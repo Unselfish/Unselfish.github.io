@@ -74,8 +74,6 @@ const glLocations = {
 gl.enableVertexAttribArray(glLocations.a.position);
 gl.vertexAttribPointer(glLocations.a.position, 2, gl.FLOAT, false, 0, 0);
 
-gl.uniform2f(glLocations.u.resolution, screen.width, screen.height);
-
 const SCALE = 0.5;
 const world = {
   width: 640 * SCALE,
@@ -232,6 +230,7 @@ function update() {
 
 function render() {
   stats.begin();
+  gl.uniform2f(glLocations.u.resolution, screen.width, screen.height);
   gl.uniform1f(glLocations.u.time, time());
   
   let i = 0;
