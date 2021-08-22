@@ -171,7 +171,7 @@ function update() {
   if (mouse.leftClick) {
     for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
       for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-        if (dx == dy || dx == -dy) {
+        if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
           const x = mouse.x + dx;
           const y = mouse.y + dy;
           if (getCell(x, y) == Cell.EMPTY) {
@@ -184,10 +184,14 @@ function update() {
   
   // ERASE
   if (mouse.rightClick) {
-    for (let y = mouse.y - BRUSH_SIZE; y < mouse.y + BRUSH_SIZE; y++) {
-      for (let x = mouse.x - BRUSH_SIZE; x < mouse.x + BRUSH_SIZE; x++) {
-        if (getCell(x, y) == Cell.SAND) {
-          cells[y][x] = Cell.EMPTY;
+    for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
+      for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
+        if (dx**2 + dy**2 < BRUSH_SIZE**2) {
+          const x = mouse.x + dx;
+          const y = mouse.y + dy;
+          if (getCell(x, y) == Cell.SAND) {
+            cells[y][x] = Cell.EMPTY;
+          }
         }
       }
     }
