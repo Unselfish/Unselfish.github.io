@@ -193,6 +193,8 @@ function update() {
     }
   }
   
+  const move_direction = ~(Math.random() * 2);
+  
   // UPDATE
   for (let y = 0; y < world.height; y++) {
     const start = ((tick + y) % 2) * world.width;
@@ -208,7 +210,7 @@ function update() {
             cells[y][x] = Cell.EMPTY;
             cells[y-1][x] = Cell.SAND;
           } else {
-            if (time() % 2 == 0) {
+            if (move_direction % 2 == 0) {
               if (getCell(x-1, y-1) == Cell.EMPTY) {
                 cells[y][x] = Cell.EMPTY;
                 cells[y-1][x-1] = Cell.SAND;
