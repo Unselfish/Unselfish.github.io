@@ -163,6 +163,7 @@ function getCell(x, y) {
   return row[x];
 }
 
+let tick = 0;
 function update() {
   const BRUSH_SIZE = 10;
   
@@ -194,7 +195,10 @@ function update() {
   
   // UPDATE
   for (let y = 0; y < world.height; y++) {
-    for (let x = 0; x < world.width; x++) {
+    const start = ((tick + y) % 2) * world.width;
+    const end = (start == 0) * world.width;
+    const direction = start == 0 ? 1 : -1;
+    for (let x = start; x - end != 0; x += direction) {
       const cell = cells[y][x];
       switch (cell) {
         case Cell.EMPTY:
@@ -204,8 +208,7 @@ function update() {
             cells[y][x] = Cell.EMPTY;
             cells[y-1][x] = Cell.SAND;
           } else {
-            const t = Math.random() * 2;
-            if (t % 2 == 0) {
+            if (time() % 2 == 0) {
               if (getCell(x-1, y-1) == Cell.EMPTY) {
                 cells[y][x] = Cell.EMPTY;
                 cells[y-1][x-1] = Cell.SAND;
@@ -226,6 +229,8 @@ function update() {
       }
     }
   }
+  
+  tick++;
 }
 
 function render() {
