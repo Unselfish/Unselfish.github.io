@@ -198,7 +198,7 @@ class World {
     
     const BRUSH_SIZE = 10;
   
-    // DRAW
+    // DRAW SAND
     if (mouse.leftClick) {
       for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
         for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
@@ -214,11 +214,11 @@ class World {
       }
     }
     
-    // ERASE
+    // DRAW WATER
     if (mouse.rightClick) {
       for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
         for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-          if (dx**2 + dy**2 < BRUSH_SIZE**2) {
+          if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
             const x = mouse.x + dx;
             const y = mouse.y + dy;
             const cell = this.get(x, y);
