@@ -74,13 +74,254 @@ const glLocations = {
 gl.enableVertexAttribArray(glLocations.a.position);
 gl.vertexAttribPointer(glLocations.a.position, 2, gl.FLOAT, false, 0, 0);
 
-const SCALE = 0.5;
-const world = {
-  width: 640 * SCALE,
-  height: 480 * SCALE
-};
+function createTable(width, height, default_value) {
+  const table = new Array(height);
+  for (let i = 0; i < table.length; i++) {
+    table[i] = new Array(width);
+    for (let j = 0; j < table[i].length; j++) {
+      table[i][j] = default_value;
+    }
+  }
+  return table;
+}
 
-const pixels = new Uint8Array(4 * world.width * world.height);
+const Color   = {};
+Color.BLACK   = [0, 0, 0];
+Color.RED     = [255, 0, 0];
+Color.GREEN   = [0, 255, 0];
+Color.BLUE    = [0, 0, 255];
+Color.YELLOW  = [255, 255, 0];
+Color.PURPLE  = [255, 0, 255];
+Color.TEAL    = [0, 255, 255];
+
+const CellMoves = {};
+CellMoves.DOWN       = 0b00000001;
+CellMoves.DOWN_LEFT  = 0b00000010;
+CellMoves.DOWN_RIGHT = 0b00000100;
+CellMoves.LEFT       = 0b00001000;
+CellMoves.RIGHT      = 0b00010000;
+
+const Cell = {};
+Cell.EMPTY  = 0;
+Cell.SAND   = 1;
+Cell.WATER  = 2;
+
+Cell.intoColor = function(cell) {
+  switch(cell) {
+    case Cell.EMPTY:
+      return Color.BLACK;
+    case Cell.SAND:
+      return Color.PURPLE;
+    case Cell.WATER:
+      return Color.TEAL;
+  }
+}
+
+Cell.intoMoves = function(cell) {
+  switch(cell) {
+    case Cell.EMPTY:
+      return null;
+    case Cell.SAND:
+      return CellMoves.DOWN | CellMoves.DOWN_LEFT | CellMoves.DOWN_RIGHT;
+    case Cell.WATER:
+      return CellMoves.DOWN | CellMoves.DOWN_LEFT | CellMoves.DOWN_RIGHT | CellMoves.LEFT | CellMoves.RIGHT;
+  }
+}
+
+class World {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    
+    this.cells = createTable(this.width, this.height, Cell.EMPTY);
+    this.pixels = new Uint8Array(4 * this.width * this.height);
+    this.tick = 0;
+  }
+  
+  update() {
+    this.tick++;
+    const move_direction = this.tick % 2;
+    
+    for (let y = 0; y < this.height; y++) {
+      const start = ((this.tick + y) % 2) * this.width;
+      const end = (start == 0) * this.width;
+      const direction = start == 0 ? 1 : -1;
+      for (let x = start; x - end != 0; x += direction) {
+        const myCell = this.getUnchecked(x, y);   // ASSUME COORDS ARE VALID
+        const myCellMoves = Cell.intoMoves(myCell.read());
+        if (myCellMoves) {
+          // MOVE DOWN
+          if (myCellMoves & CellMoves.DOWN) {
+            const bottomCell = myCell.shifted(0, -1);
+            if (bottomCell && bottomCell.isEmpty()) {
+              CellRef.swap(myCell, bottomCell);
+              continue;
+            }
+          }
+          
+          // MOVE BOTTOM LEFT AND RIGHT
+          {
+            const bottomLeftCell = myCellMoves & CellMoves.DOWN_LEFT && myCell.shifted(-1, -1) || null;
+            const bottomRightCell = myCellMoves & CellMoves.DOWN_RIGHT && myCell.shifted(+1, -1) || null;
+            
+            const firstCell = move_direction % 2 == 0 ? bottomLeftCell : bottomRightCell;
+            const secondCell = move_direction % 2 == 0 ? bottomRightCell : bottomLeftCell;
+            
+            if (firstCell && firstCell.isEmpty()) {
+              CellRef.swap(myCell, firstCell);
+              continue;
+            } else if (secondCell && secondCell.isEmpty()) {
+              CellRef.swap(myCell, secondCell);
+              continue;
+            }
+          }
+          
+          // MOVE LEFT AND RIGHT
+          {
+            const leftCell = myCellMoves & CellMoves.LEFT && myCell.shifted(-1, 0) || null;
+            const rightCell = myCellMoves & CellMoves.RIGHT && myCell.shifted(+1, 0) || null;
+            
+            const firstCell = move_direction % 2 == 0 ? leftCell : rightCell;
+            const secondCell = move_direction % 2 == 0 ? rightCell : leftCell;
+            
+            if (firstCell && firstCell.isEmpty()) {
+              CellRef.swap(myCell, firstCell);
+              continue;
+            } else if (secondCell && secondCell.isEmpty()) {
+              CellRef.swap(myCell, secondCell);
+              continue;
+            }
+          }
+        }
+      }
+    }
+    
+    const BRUSH_SIZE = 10;
+  
+    // DRAW
+    if (mouse.leftClick) {
+      for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
+        for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
+          if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
+            const x = mouse.x + dx;
+            const y = mouse.y + dy;
+            const cell = this.get(x, y);
+            if (cell && cell.isEmpty()) {
+              cell.write(Cell.SAND);
+            }
+          }
+        }
+      }
+    }
+    
+    // ERASE
+    if (mouse.rightClick) {
+      for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
+        for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
+          if (dx**2 + dy**2 < BRUSH_SIZE**2) {
+            const x = mouse.x + dx;
+            const y = mouse.y + dy;
+            const cell = this.get(x, y);
+            if (cell && cell.isEmpty()) {
+              cell.write(Cell.WATER);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  get(x, y) {
+    return CellRef.getIfValid(this, x, y);
+  }
+  
+  getUnchecked(x, y) {
+    return new CellRef(this, x, y);
+  }
+  
+  render() {
+    let i = 0;
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        const cell = this.getUnchecked(x, y);
+        const color = Cell.intoColor(cell.read());
+        this.pixels[i++] = color[0];
+        this.pixels[i++] = color[1];
+        this.pixels[i++] = color[2];
+        this.pixels[i++] = 255;
+      }
+    }
+  }
+  
+  save() {
+    const worldProps = JSON.stringify({
+      width: this.width,
+      height: this.height,
+      cells: this.cells,
+      tick: this.tick
+    });
+    localStorage.setItem("worldSave", worldProps);
+  }
+  
+  static makeDefault() {
+    const SCALE = 0.5;
+    const WIDTH = 640 * SCALE;
+    const HEIGHT = 480 * SCALE;
+    return new World(WIDTH, HEIGHT);
+  }
+  
+  static load() {
+    const worldProps = JSON.parse(localStorage.getItem("worldSave"));
+    const world = new World(worldProps.width, worldProps.height);
+    world.cells = worldProps.cells;
+    world.tick = worldProps.tick;
+    return world;
+  }
+}
+
+class CellRef {
+  constructor(world, x, y) {
+    this.world = world;
+    this.x = x;
+    this.y = y;
+  }
+  
+  read() {
+    return this.world.cells[this.y][this.x];
+  }
+  
+  write(newCell) {
+    this.world.cells[this.y][this.x] = newCell;
+  }
+  
+  is(cell) {
+    return this.read() == cell;
+  }
+  
+  isEmpty() {
+    return this.is(Cell.EMPTY);
+  }
+  
+  shifted(dx, dy) {
+    return CellRef.getIfValid(this.world, this.x + dx, this.y + dy);
+  }
+  
+  static getIfValid(world, x, y) {
+    if (0 <= x && x < world.width &&
+        0 <= y && y < world.height) {
+      return new CellRef(world, x, y);
+    }
+  }
+  
+  static swap(refCellA, refCellB) {
+    const a = refCellA.read();
+    const b = refCellB.read();
+    refCellA.write(b);
+    refCellB.write(a);
+  }
+}
+
+let world = World.makeDefault();
 
 const screenTexture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, screenTexture);
@@ -89,7 +330,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
-function updateScreenTexture() {
+function updateScreenTexture(pixels) {
   const level = 0;
   const internalFormat = gl.RGBA;
   const width = world.width;
@@ -132,23 +373,24 @@ screen.onmouseup = e => {
     mouse.rightClick = false;
   }
 }
-
-function createTable(width, height, default_value) {
-  const table = new Array(height);
-  for (let i = 0; i < table.length; i++) {
-    table[i] = new Array(width);
-    for (let j = 0; j < table[i].length; j++) {
-      table[i][j] = default_value;
+document.onkeydown = e => {  
+  e.preventDefault();
+};
+document.onkeyup = e => {
+  if (e.ctrlKey) {
+    switch(e.code) {
+      case "KeyS":
+        world.save();
+        break;
+      case "KeyL":
+        world = World.load();
+        break;
+      case "KeyR":
+        world = World.makeDefault();
+        break;
     }
   }
-  return table;
-}
-
-const Cell = {};
-Cell.EMPTY = 0;
-Cell.SAND = 1;
-
-const cells = createTable(world.width, world.height, Cell.EMPTY);
+};
 
 const start = Date.now();
 const time = () => (Date.now() - start) / 1e3;
@@ -157,114 +399,13 @@ const stats = new Stats();
 stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
 document.body.appendChild(stats.dom);
 
-function getCell(x, y) {
-  const row = cells[y];
-  if (row == null) return null;
-  return row[x];
-}
-
-let tick = 0;
-function update() {
-  const BRUSH_SIZE = 10;
-  
-  // DRAW
-  if (mouse.leftClick) {
-    for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
-      for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-        if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
-          const x = mouse.x + dx;
-          const y = mouse.y + dy;
-          if (getCell(x, y) == Cell.EMPTY) {
-            cells[y][x] = Cell.SAND;
-          }
-        }
-      }
-    }
-  }
-  
-  // ERASE
-  if (mouse.rightClick) {
-    for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
-      for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-        if (dx**2 + dy**2 < BRUSH_SIZE**2) {
-          const x = mouse.x + dx;
-          const y = mouse.y + dy;
-          if (getCell(x, y) == Cell.SAND) {
-            cells[y][x] = Cell.EMPTY;
-          }
-        }
-      }
-    }
-  }
-  
-  const move_direction = ~(Math.random() * 2);
-  
-  // UPDATE
-  for (let y = 0; y < world.height; y++) {
-    const start = ((tick + y) % 2) * world.width;
-    const end = (start == 0) * world.width;
-    const direction = start == 0 ? 1 : -1;
-    for (let x = start; x - end != 0; x += direction) {
-      const cell = cells[y][x];
-      switch (cell) {
-        case Cell.EMPTY:
-          break;
-        case Cell.SAND:
-          if (getCell(x, y-1) == Cell.EMPTY) {
-            cells[y][x] = Cell.EMPTY;
-            cells[y-1][x] = Cell.SAND;
-          } else {
-            if (move_direction % 2 == 0) {
-              if (getCell(x-1, y-1) == Cell.EMPTY) {
-                cells[y][x] = Cell.EMPTY;
-                cells[y-1][x-1] = Cell.SAND;
-              } else if (getCell(x+1, y-1) == Cell.EMPTY) {
-                cells[y][x] = Cell.EMPTY;
-                cells[y-1][x+1] = Cell.SAND;
-              }
-            } else {
-              if (getCell(x+1, y-1) == Cell.EMPTY) {
-                cells[y][x] = Cell.EMPTY;
-                cells[y-1][x+1] = Cell.SAND;
-              } else if (getCell(x-1, y-1) == Cell.EMPTY) {
-                cells[y][x] = Cell.EMPTY;
-                cells[y-1][x-1] = Cell.SAND;
-              }
-            }
-          }
-      }
-    }
-  }
-  
-  tick++;
-}
-
 function render() {
   stats.begin();
   gl.uniform2f(glLocations.u.resolution, screen.width, screen.height);
   gl.uniform1f(glLocations.u.time, time());
   
-  let i = 0;
-  for (let y = 0; y < world.height; y++) {
-    for (let x = 0; x < world.width; x++) {
-      const cell = cells[y][x];
-      switch (cell) {
-        case Cell.EMPTY:
-          pixels[i++] = 0;
-          pixels[i++] = 0;
-          pixels[i++] = 0;
-          break;
-        case Cell.SAND:
-          pixels[i++] = 255;
-          pixels[i++] = 255;
-          pixels[i++] = 0;
-          break;
-      }
-      pixels[i++] = 255;
-    }
-  }
-  
-  updateScreenTexture();
+  world.render();
+  updateScreenTexture(world.pixels);
   
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   stats.end();
@@ -273,4 +414,6 @@ function render() {
 }
 render();
 
-setInterval(update, 1e3/60);
+setInterval(function() {
+  world.update();
+}, 1e3/60);
