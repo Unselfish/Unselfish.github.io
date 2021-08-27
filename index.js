@@ -143,9 +143,9 @@ class World {
     const move_direction = this.tick % 2;
     
     for (let y = 0; y < this.height; y++) {
-      const start = ((this.tick + y) % 2) * this.width;
-      const end = (start == 0) * this.width;
-      const direction = start == 0 ? 1 : -1;
+      const start = 0//((this.tick + y) % 2) * this.width;
+      const end = this.width//(start == 0) * this.width;
+      const direction = 1//start == 0 ? 1 : -1;
       for (let x = start; x - end != 0; x += direction) {
         const myCell = this.getUnchecked(x, y);   // ASSUME COORDS ARE VALID
         const myCellMoves = Cell.intoMoves(myCell.read());
