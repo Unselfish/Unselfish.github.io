@@ -373,10 +373,10 @@ screen.onmouseup = e => {
     mouse.rightClick = false;
   }
 }
-document.onkeydown = e => {  
+screen.onkeydown = e => {  
   e.preventDefault();
 };
-document.onkeyup = e => {
+screen.onkeyup = e => {
   if (e.ctrlKey) {
     switch(e.code) {
       case "KeyS":
