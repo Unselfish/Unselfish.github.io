@@ -124,7 +124,7 @@ Cell.intoMoves = function(cell) {
     case Cell.SAND:
       return CellMoves.DOWN | CellMoves.DOWN_LEFT | CellMoves.DOWN_RIGHT;
     case Cell.WATER:
-      return CellMoves.DOWN | CellMoves.DOWN_LEFT | CellMoves.DOWN_RIGHT | CellMoves.LEFT | CellMoves.RIGHT;
+      return CellMoves.DOWN | CellMoves.LEFT | CellMoves.RIGHT | CellMoves.DOWN_LEFT | CellMoves.DOWN_RIGHT;
   }
 }
 
@@ -133,45 +133,36 @@ class World {
     this.width = width;
     this.height = height;
     
-    this.cells = createTable(this.width, this.height, Cell.EMPTY);
-    this.pixels = new Uint8Array(4 * this.width * this.height);
     this.tick = 0;
+    
+    this.cells   = createTable(this.width, this.height, Cell.EMPTY);
+    this.clocks  = createTable(this.width, this.height, this.tick);
+    
+    this.pixels  = new Uint8Array(4 * this.width * this.height);
   }
   
   update() {
     this.tick++;
-    const move_direction = this.tick % 2;
     
-    for (let y = 0; y < this.height; y++) {
-      const start = 0//((this.tick + y) % 2) * this.width;
-      const end = this.width//(start == 0) * this.width;
-      const direction = 1//start == 0 ? 1 : -1;
+    for (let y = this.height - 1; y > 0; y--) {
+      const start = (y % 2) * this.width;
+      const end = (start == 0) * this.width;
+      const direction = start == 0 ? 1 : -1;
       for (let x = start; x - end != 0; x += direction) {
         const myCell = this.getUnchecked(x, y);   // ASSUME COORDS ARE VALID
+        if (myCell.changed()) {
+          continue;
+        }
+        
         const myCellMoves = Cell.intoMoves(myCell.read());
+        
+        const move_direction = ~(Math.random() * 2) % 2;
         if (myCellMoves) {
           // MOVE DOWN
           if (myCellMoves & CellMoves.DOWN) {
             const bottomCell = myCell.shifted(0, -1);
             if (bottomCell && bottomCell.isEmpty()) {
               CellRef.swap(myCell, bottomCell);
-              continue;
-            }
-          }
-          
-          // MOVE BOTTOM LEFT AND RIGHT
-          {
-            const bottomLeftCell = myCellMoves & CellMoves.DOWN_LEFT && myCell.shifted(-1, -1) || null;
-            const bottomRightCell = myCellMoves & CellMoves.DOWN_RIGHT && myCell.shifted(+1, -1) || null;
-            
-            const firstCell = move_direction % 2 == 0 ? bottomLeftCell : bottomRightCell;
-            const secondCell = move_direction % 2 == 0 ? bottomRightCell : bottomLeftCell;
-            
-            if (firstCell && firstCell.isEmpty()) {
-              CellRef.swap(myCell, firstCell);
-              continue;
-            } else if (secondCell && secondCell.isEmpty()) {
-              CellRef.swap(myCell, secondCell);
               continue;
             }
           }
@@ -192,38 +183,57 @@ class World {
               continue;
             }
           }
-        }
-      }
-    }
-    
-    const BRUSH_SIZE = 10;
-  
-    // DRAW SAND
-    if (mouse.leftClick) {
-      for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
-        for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-          if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
-            const x = mouse.x + dx;
-            const y = mouse.y + dy;
-            const cell = this.get(x, y);
-            if (cell && cell.isEmpty()) {
-              cell.write(Cell.SAND);
+          
+          // MOVE BOTTOM LEFT AND RIGHT
+          {
+            const bottomLeftCell = myCellMoves & CellMoves.DOWN_LEFT && myCell.shifted(-1, -1) || null;
+            const bottomRightCell = myCellMoves & CellMoves.DOWN_RIGHT && myCell.shifted(+1, -1) || null;
+            
+            const firstCell = move_direction % 2 == 0 ? bottomLeftCell : bottomRightCell;
+            const secondCell = move_direction % 2 == 0 ? bottomRightCell : bottomLeftCell;
+            
+            if (firstCell && firstCell.isEmpty()) {
+              CellRef.swap(myCell, firstCell);
+              continue;
+            } else if (secondCell && secondCell.isEmpty()) {
+              CellRef.swap(myCell, secondCell);
+              continue;
             }
           }
         }
       }
     }
     
-    // DRAW WATER
-    if (mouse.rightClick) {
-      for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
-        for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
-          if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
-            const x = mouse.x + dx;
-            const y = mouse.y + dy;
-            const cell = this.get(x, y);
-            if (cell && cell.isEmpty()) {
-              cell.write(Cell.WATER);
+    const BRUSH_SIZE = 3;
+  
+    if (this.tick % 1 == 0) {
+      // DRAW SAND
+      if (mouse.leftClick) {
+        for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
+          for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
+            if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
+              const x = mouse.x + dx;
+              const y = mouse.y + dy;
+              const cell = this.get(x, y);
+              if (cell && cell.isEmpty()) {
+                cell.write(Cell.SAND);
+              }
+            }
+          }
+        }
+      }
+      
+      // DRAW WATER
+      if (mouse.rightClick) {
+        for (let dy = -BRUSH_SIZE; dy < BRUSH_SIZE; dy++) {
+          for (let dx = -BRUSH_SIZE; dx < BRUSH_SIZE; dx++) {
+            if (dx**2 + dy**2 < BRUSH_SIZE**2 && Math.random() < 0.3) {
+              const x = mouse.x + dx;
+              const y = mouse.y + dy;
+              const cell = this.get(x, y);
+              if (cell && cell.isEmpty()) {
+                cell.write(Cell.WATER);
+              }
             }
           }
         }
@@ -306,6 +316,10 @@ class CellRef {
     return CellRef.getIfValid(this.world, this.x + dx, this.y + dy);
   }
   
+  changed() {
+    return this.world.tick == this.world.clocks[this.y][this.x];
+  }
+  
   static getIfValid(world, x, y) {
     if (0 <= x && x < world.width &&
         0 <= y && y < world.height) {
@@ -318,6 +332,8 @@ class CellRef {
     const b = refCellB.read();
     refCellA.write(b);
     refCellB.write(a);
+    
+    refCellB.world.clocks[refCellB.y][refCellB.x] = refCellB.world.tick;
   }
 }
 
